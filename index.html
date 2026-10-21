@@ -317,6 +317,7 @@ select.in option{color:#111}
 .dbtn.big{width:76px;height:76px;border-radius:26px}
 .dbtn.on{background:rgba(232,185,76,.38)}
 .dbtn svg{width:30px;height:30px}
+.tfire{position:absolute;right:16px;bottom:30px;z-index:4;width:68px;height:68px;border-radius:50%;background:rgba(255,160,60,.28);border-color:rgba(255,190,100,.7)}
 .dover{position:absolute;inset:0;display:grid;place-items:center;background:rgba(8,6,24,.68);z-index:6;padding:20px;animation:fade .2s both}
 .dcard{width:min(320px,100%);padding:22px;border-radius:24px;background:linear-gradient(#2a2260,#1a1442);border:1px solid var(--line);display:flex;flex-direction:column;gap:12px;text-align:center}
 .dcard h2{margin:0;font:600 26px/1.1 var(--f-title);letter-spacing:.03em}
@@ -1331,18 +1332,18 @@ const GEMS=['#4ee3ff','#ff6bd6','#ffd84a','#8cff7a'];
 const worldOf=n=>WORLDS[Math.floor((n-1)/6)];
 const lvlLabel=n=>(Math.floor((n-1)/6)+1)+'-'+((n-1)%6+1);
 function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-function genLevel(n){
-  const rnd=mulberry(n*9973+17),R=(a,b)=>a+Math.floor(rnd()*(b-a+1));
-  const W=50+n*3,H=DH,g=Array.from({length:H},()=>Array(W).fill('.'));
+function genLevel(n,o){
+  o=o||{};const rnd=mulberry(o.seed||n*9973+17),R=(a,b)=>a+Math.floor(rnd()*(b-a+1));
+  const W=o.W||50+n*3,H=DH,g=Array.from({length:H},()=>Array(W).fill('.'));
   const crystals=[],enemies=[];
-  let x=0,gy=10,cp=null,mid=false,last='';
+  let x=0,gy=o.gy0||10,cp=null,mid=!!o.noCp,last='';
   const maxGap=Math.min(5,2+Math.floor(n/7));
   const clampY=v=>Math.max(7,Math.min(11,v));
   const cr=(cx,cy)=>{if(cx>2&&cx<W-4)crystals.push({x:cx,y:cy,got:false});};
   const run=len=>{const s=x;for(let i=0;i<len&&x<W;i++){for(let r=gy;r<H;r++)g[r][x]='#';x++;}return s;};
   const line=(cx,k,cy)=>{for(let i=0;i<k;i++)cr(cx+i+.5,cy);};
   const start={x:2,y:gy-.8};
-  run(7);
+  run(o.lead||(o.gy0?4:7));
   while(x<W-14){
     if(!mid&&x>W/2){const s=run(6);cp={x:s+3,y:gy};mid=true;last='run';continue;}
     const opts=[['run',18],['step',15],['gap',22+n*.6],['plat',18],['spk',n>=3?10+n*.5:0],['pil',n>=6?8:0],['fly',n>=10?8:0]];
@@ -1380,7 +1381,7 @@ function genLevel(n){
     }
   }
   run(W-x);
-  return {W,H,g,crystals,enemies,cp,exit:{x:W-4,y:gy},start};
+  return {W,H,g,crystals,enemies,cp,exit:{x:W-4,y:gy},start,gy};
 }
 function shade(hex,k){
   let h=String(hex).replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');
@@ -1440,16 +1441,18 @@ SCREENS.dino=node=>{
       <div class="group"><h2>Ton dragon</h2><div class="dprev"><canvas id="dpv" width="224" height="224"></canvas><div class="ctrl">
         <div class="swatches" role="group" aria-label="Couleur du dragon">${DRAGON_COLORS.map(c=>`<button class="swt" style="--c:${c}" data-col="${c}" aria-pressed="${d.color===c}" aria-label="Couleur ${c}"></button>`).join('')}</div>
         <div class="field"><label for="dcol">Couleur personnalisée</label><input class="in" id="dcol" type="color" value="${d.color}" style="padding:4px"></div></div></div></div>
+      <div class="group"><h2>Mode infini</h2><button class="btn block" data-endless="1">Courir à l'infini · Record : ${d.best||0} m</button><p class="small">Un parcours sans fin, de plus en plus dur. Va le plus loin possible : une seule vie !</p></div>
       ${WORLDS.map((w,wi)=>`<div class="group"><h2>${wi+1} · ${w.name}</h2><div class="lv-grid">${[1,2,3,4,5,6].map(k=>{
         const n=wi*6+k,lk=!unlocked(n),r=d.res[n];
         return `<button class="lv" data-lv="${n}" ${lk?'disabled':''} aria-label="Niveau ${wi+1}-${k}${lk?', verrouillé':r?', '+r.s+' étoiles':''}"><span>${wi+1}-${k}</span><small>${lk?IC_LOCK:'★'.repeat(r?r.s:0)+'☆'.repeat(3-(r?r.s:0))}</small></button>`;}).join('')}</div></div>`).join('')}
       <div class="group"><div class="sw"><span id="ual">Débloquer tous les niveaux</span><button role="switch" aria-checked="${!!d.all}" aria-labelledby="ual" id="uall"></button></div>
-        <p class="small">Flèches ou A/D pour bouger, Espace ou W pour sauter (deux fois pour double saut), F pour le souffle de feu. Écrase les ennemis ou brûle-les. Récolte tous les cristaux pour 3 étoiles.</p></div>
+        <p class="small">${matchMedia('(pointer:coarse)').matches?"Sur mobile : garde le doigt appuyé sur l'écran, le dragon va vers l'endroit touché (touche plus haut pour sauter). Bouton feu en bas à droite.":'Flèches ou A/D pour bouger, Espace ou W pour sauter (deux fois pour double saut), F pour le souffle de feu.'} Écrase les ennemis ou brûle-les. Récolte tous les cristaux pour 3 étoiles.</p></div>
     </div>`;
     paintPreview();
   }
   function setColor(c){D().color=c;save();$$('.swt',node).forEach(b=>b.setAttribute('aria-pressed',b.dataset.col===c));const i=$('#dcol',node);if(i)i.value=c;paintPreview();}
   node.addEventListener('click',e=>{
+    if(e.target.closest('[data-endless]')){play(0,true);return;}
     const lvb=e.target.closest('[data-lv]');if(lvb){if(!lvb.disabled)play(+lvb.dataset.lv);return;}
     const sw=e.target.closest('[data-col]');if(sw){setColor(sw.dataset.col);return;}
     if(e.target.closest('#uall')){D().all=!D().all;save();menu();}
@@ -1457,18 +1460,22 @@ SCREENS.dino=node=>{
   node.addEventListener('input',e=>{if(e.target.id==='dcol'){D().color=e.target.value;save();$$('.swt',node).forEach(b=>b.setAttribute('aria-pressed',false));paintPreview();}});
 
   /* ---------- jeu ---------- */
-  function play(n){
+  function play(n,endless){
     if(stop){stop();stop=null;}
-    const lv=genLevel(n),wd=worldOf(n),d=D(),total=lv.crystals.length;
+    const END=!!endless,TOUCH=matchMedia('(pointer:coarse)').matches;
+    const lv=END?genLevel(1,{seed:777,W:56,noCp:true,lead:14}):genLevel(n),d=D();let wd=worldOf(END?1:n);const total=lv.crystals.length;
+    if(END){lv.seg=0;lv.exit={x:-99,y:0};lv.cp=null;}
     const GRAV=38,JUMP=15,DJUMP=12.5,SPD=6.6;
     node.innerHTML=`<div class="dgame"><div class="dcv" id="dcv"><canvas id="dc"></canvas>
-      <div class="dhud"><button class="ibtn" id="dback" aria-label="Menu des niveaux">${ICON.back}</button><span class="hud-pill" id="hlv">${esc(wd.name)} ${lvlLabel(n)}</span><span class="hud-pill" id="hcr"></span><span class="hud-pill" id="htm" style="margin-left:auto"></span><button class="ibtn" id="dpause" aria-label="Pause" style="width:38px;height:38px">${IC_P.replace('<svg','<svg width="18" height="18"')}</button></div></div>
-      <div class="dctl"><div class="grp"><button class="dbtn" data-k="left" aria-label="Gauche">${IC_L}</button><button class="dbtn" data-k="right" aria-label="Droite">${IC_R}</button></div>
-      <div class="grp"><button class="dbtn" data-k="fire" aria-label="Souffle de feu">${IC_F}</button><button class="dbtn big" data-k="jump" aria-label="Sauter">${IC_U}</button></div></div></div>`;
+      <div class="dhud"><button class="ibtn" id="dback" aria-label="Menu des niveaux">${ICON.back}</button><span class="hud-pill" id="hlv">${END?'Mode infini':esc(wd.name)+' '+lvlLabel(n)}</span><span class="hud-pill" id="hcr"></span><span class="hud-pill" id="htm" style="margin-left:auto"></span><button class="ibtn" id="dpause" aria-label="Pause" style="width:38px;height:38px">${IC_P.replace('<svg','<svg width="18" height="18"')}</button></div>${TOUCH?`<button class="dbtn tfire" data-k="fire" aria-label="Souffle de feu">${IC_F}</button>`:''}</div>
+      ${TOUCH?'':`<div class="dctl"><div class="grp"><button class="dbtn" data-k="left" aria-label="Gauche">${IC_L}</button><button class="dbtn" data-k="right" aria-label="Droite">${IC_R}</button></div>
+      <div class="grp"><button class="dbtn" data-k="fire" aria-label="Souffle de feu">${IC_F}</button><button class="dbtn big" data-k="jump" aria-label="Sauter">${IC_U}</button></div></div>`}</div>`;
     const game=$('.dgame',node),host=$('#dcv',node),cv=$('#dc',node),ctx=cv.getContext('2d');
     const K={left:0,right:0,jump:0,fire:0};let jumpEdge=false,fireEdge=false;
     const P={x:lv.start.x,y:lv.start.y,w:.7,h:.8,vx:0,vy:0,on:false,face:1,coy:0,buf:0,dj:true,fcd:0,dead:false};
     const S={t:0,time:0,crys:0,deaths:0,deathT:0,over:false,paused:false,cpOn:false};
+    const dist=()=>Math.max(0,Math.floor(P.x-lv.start.x));
+    const TCH={on:false,x:0,y:0,id:null,sx:0,sy:0,ax:0};
     let fire=[],parts=[],cam={x:0,y:0,snap:true},T=40,VW=9,VH=12,cw=0,ch=0,raf=0,last=performance.now(),acc=0;
     const tileAt=(cx,cy)=>cx<0||cx>=lv.W?'#':cy<0||cy>=lv.H?'.':lv.g[cy][cx];
     const ov=(a,b,c2,d2,e2,f,g2,h)=>a<e2+g2&&a+c2>e2&&b<f+h&&b+d2>f;
@@ -1496,19 +1503,46 @@ SCREENS.dino=node=>{
         ${n<NLEV?'<button class="btn" data-a="next">Niveau suivant</button>':'<p class="small" style="margin:0">Tu as fini le dernier niveau.</p>'}<button class="btn ghost" data-a="again">Rejouer</button><button class="btn ghost" data-a="menu">Tous les niveaux</button></div></div>`);
       game.appendChild(o);
     }
+    function extend(){
+      const k=++lv.seg,seg=genLevel(Math.min(30,1+Math.floor(k*1.5)),{seed:k*7919+101,W:48,gy0:lv.gy,noCp:true}),off=lv.W;
+      for(let r=0;r<lv.H;r++)lv.g[r].push(...seg.g[r]);
+      lv.crystals=lv.crystals.filter(c=>!c.got&&c.x>P.x-40);seg.crystals.forEach(c=>{c.x+=off;lv.crystals.push(c);});
+      lv.enemies=lv.enemies.filter(e=>e.alive&&e.x>P.x-40);seg.enemies.forEach(e=>{['x','a','b','cx'].forEach(p=>{if(e[p]!=null)e[p]+=off;});lv.enemies.push(e);});
+      lv.W+=seg.W;lv.gy=seg.gy;
+    }
+    function endRun(){
+      S.over=true;const m=dist(),old=d.best||0,rec=m>old;if(rec){d.best=m;}save();
+      game.appendChild(el(`<div class="dover"><div class="dcard"><h2>Fin de la course</h2><div class="dstars" style="font-size:44px;letter-spacing:0">${m} m</div><p style="margin:0">${rec?'<b>Nouveau record !</b>':'Record : <b>'+old+' m</b>'}<br>Cristaux : <b>${S.crys}</b></p><button class="btn" data-a="againE">Rejouer</button><button class="btn ghost" data-a="menu">Menu</button></div></div>`));
+    }
     function pause(on){
       if(S.over)return;S.paused=on;const ex=$('.dover',game);if(ex)ex.remove();
-      if(on){setKey('left',0);setKey('right',0);game.appendChild(el(`<div class="dover"><div class="dcard"><h2>Pause</h2><button class="btn" data-a="resume">Reprendre</button><button class="btn ghost" data-a="again">Recommencer</button><button class="btn ghost" data-a="menu">Tous les niveaux</button></div></div>`));}
+      if(on){setKey('left',0);setKey('right',0);game.appendChild(el(`<div class="dover"><div class="dcard"><h2>Pause</h2><button class="btn" data-a="resume">Reprendre</button><button class="btn ghost" data-a="${END?'againE':'again'}">Recommencer</button><button class="btn ghost" data-a="menu">${END?'Menu':'Tous les niveaux'}</button></div></div>`));}
     }
     game.addEventListener('click',e=>{
       const a=e.target.closest('[data-a]');
-      if(a){const k=a.dataset.a;if(k==='next')play(n+1);else if(k==='again')play(n);else if(k==='menu')menu();else if(k==='resume')pause(false);return;}
+      if(a){const k=a.dataset.a;if(k==='next')play(n+1);else if(k==='again')play(n);else if(k==='againE')play(0,true);else if(k==='menu')menu();else if(k==='resume')pause(false);return;}
       if(e.target.closest('#dback'))menu();else if(e.target.closest('#dpause'))pause(!S.paused);
     });
     $$('[data-k]',game).forEach(b=>{const k=b.dataset.k;
       b.addEventListener('pointerdown',e=>{e.preventDefault();try{b.setPointerCapture(e.pointerId);}catch(_){}setKey(k,1);});
       ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,()=>setKey(k,0)));
       b.addEventListener('contextmenu',e=>e.preventDefault());});
+    if(TOUCH){
+      const toWorld=e=>{const r=host.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
+      host.addEventListener('pointerdown',e=>{if(e.target.closest('button')||S.paused||S.over||TCH.id!==null)return;e.preventDefault();try{host.setPointerCapture(e.pointerId);}catch(_){}TCH.id=e.pointerId;TCH.on=true;const w=toWorld(e);TCH.x=w.x;TCH.y=w.y;});
+      host.addEventListener('pointermove',e=>{if(e.pointerId!==TCH.id)return;const w=toWorld(e);TCH.x=w.x;TCH.y=w.y;});
+      ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>host.addEventListener(ev,e=>{if(e.pointerId!==TCH.id)return;TCH.on=false;TCH.id=null;TCH.ax=0;K.jump=0;}));
+      host.addEventListener('contextmenu',e=>e.preventDefault());
+    }
+    function touchCtl(){
+      if(!TCH.on||P.dead){TCH.ax=0;return;}
+      const wx=cam.x+TCH.x/T,wy=cam.y+TCH.y/T,dx=wx-(P.x+P.w/2),dy=wy-(P.y+P.h/2);
+      TCH.ax=Math.abs(dx)<.3?0:Math.max(-1,Math.min(1,dx/1.6));
+      const up=dy<-1.1;
+      if(up&&P.on)jumpEdge=true;
+      else if(up&&!P.on&&P.dj&&P.vy>1&&dy<-2.4)jumpEdge=true;
+      K.jump=up?1:0;
+    }
     const KM={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'jump',KeyW:'jump',Space:'jump',KeyF:'fire',KeyX:'fire',KeyJ:'fire',ShiftLeft:'fire',ShiftRight:'fire'};
     const kd=e=>{if(e.code==='KeyP'){pause(!S.paused);return;}const k=KM[e.code];if(!k)return;e.preventDefault();if(!e.repeat||!K[k])setKey(k,1);};
     const ku=e=>{const k=KM[e.code];if(!k)return;e.preventDefault();setKey(k,0);};
@@ -1519,10 +1553,12 @@ SCREENS.dino=node=>{
 
     function step(dt){
       S.t+=dt;
-      if(P.dead){S.deathT-=dt;upParts(dt);if(S.deathT<=0)respawn();return;}
+      if(P.dead){S.deathT-=dt;upParts(dt);if(S.deathT<=0){if(END)endRun();else respawn();}return;}
       S.time+=dt;
-      const ax=K.right-K.left;
-      if(ax){P.vx+=ax*(P.on?70:45)*dt;if(Math.abs(P.vx)>SPD)P.vx=Math.sign(P.vx)*SPD;P.face=ax;}
+      if(TOUCH)touchCtl();
+      if(END){if(lv.W-P.x<45)extend();const wi=(Math.floor(P.x/160)%5)*6+1;if(worldOf(wi)!==wd)wd=worldOf(wi);}
+      const ax=(K.right-K.left)||TCH.ax;
+      if(ax){P.vx+=ax*(P.on?70:45)*dt;const lim=SPD*Math.max(.4,Math.abs(ax));if(Math.abs(P.vx)>lim)P.vx=Math.sign(P.vx)*lim;P.face=ax>0?1:-1;}
       else{const fr=(P.on?60:14)*dt;P.vx=Math.abs(P.vx)<=fr?0:P.vx-Math.sign(P.vx)*fr;}
       P.coy=P.on?.1:P.coy-dt;
       if(jumpEdge)P.buf=.12;else P.buf-=dt;jumpEdge=false;
@@ -1555,7 +1591,7 @@ SCREENS.dino=node=>{
         let hit=false;lv.enemies.forEach(e=>{if(e.alive&&!hit){const b=eBox(e);if(ov(f.x-.2,f.y-.2,.4,.4,b.x,b.y,b.w,b.h)){e.alive=false;hit=true;burst(e.x,b.y+b.h/2,'#ff9a3c',16,4);}}});
         return !hit;});
       if(lv.cp&&!S.cpOn&&P.x>lv.cp.x-.5){S.cpOn=true;burst(lv.cp.x,lv.cp.y-1.2,'#7dff9a',16,3);}
-      if(ov(P.x,P.y,P.w,P.h,lv.exit.x-.6,lv.exit.y-1.6,1.2,1.6))win();
+      if(!END&&ov(P.x,P.y,P.w,P.h,lv.exit.x-.6,lv.exit.y-1.6,1.2,1.6))win();
       upParts(dt);
     }
     function upParts(dt){parts=parts.filter(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=12*dt;return p.life>0;});}
@@ -1590,7 +1626,7 @@ SCREENS.dino=node=>{
         else if(t==='^'){ctx.fillStyle='#e3e9f5';ctx.strokeStyle='#5a6485';ctx.lineWidth=1.5;for(let i=0;i<3;i++){const a=px+i*T/3;ctx.beginPath();ctx.moveTo(a,py+T);ctx.lineTo(a+T/6,py+T*.42);ctx.lineTo(a+T/3,py+T);ctx.closePath();ctx.fill();ctx.stroke();}}}
       ctx.fillStyle=wd.dark;ctx.fillRect(0,sy(lv.H),cw,ch);
       // sortie
-      {const ex=sx(lv.exit.x),ey=sy(lv.exit.y),pulse=1+Math.sin(S.t*4)*.06;
+      if(!END){const ex=sx(lv.exit.x),ey=sy(lv.exit.y),pulse=1+Math.sin(S.t*4)*.06;
        const g2=ctx.createRadialGradient(ex,ey-T*.8,T*.1,ex,ey-T*.8,T*1.1*pulse);g2.addColorStop(0,'rgba(255,255,255,.95)');g2.addColorStop(.4,'rgba(170,120,255,.8)');g2.addColorStop(1,'rgba(120,70,220,0)');
        ctx.fillStyle=g2;ctx.beginPath();ctx.ellipse(ex,ey-T*.8,T*.75,T*1.05,0,0,7);ctx.fill();
        ctx.strokeStyle='#e8b94c';ctx.lineWidth=Math.max(3,T*.1);ctx.beginPath();ctx.ellipse(ex,ey-T*.8,T*.58,T*.95,0,0,7);ctx.stroke();}
@@ -1609,9 +1645,10 @@ SCREENS.dino=node=>{
           ctx.beginPath();ctx.arc(px,py,T*.3,0,7);ctx.fill();ctx.fillStyle='#ff4d6d';ctx.beginPath();ctx.arc(px-T*.11,py-T*.04,T*.07,0,7);ctx.arc(px+T*.11,py-T*.04,T*.07,0,7);ctx.fill();}});
       fire.forEach(f=>{const px=sx(f.x),py=sy(f.y),r=T*.24,g3=ctx.createRadialGradient(px,py,1,px,py,r*1.6);g3.addColorStop(0,'#fff6c0');g3.addColorStop(.4,'#ffa83a');g3.addColorStop(1,'rgba(255,80,20,0)');ctx.fillStyle=g3;ctx.beginPath();ctx.arc(px,py,r*1.6,0,7);ctx.fill();});
       if(!P.dead)drawDragon(ctx,sx(P.x+P.w/2),sy(P.y+P.h),T*1.08,d.color,{face:P.face,t:S.t,air:!P.on,walk:Math.min(1,Math.abs(P.vx)/SPD)});
+      if(TOUCH&&TCH.on){const rx=TCH.x,ry=TCH.y;ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(rx,ry,T*(.5+.08*Math.sin(S.t*8)),0,7);ctx.stroke();ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.arc(rx,ry,T*.2,0,7);ctx.fill();}
       parts.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/p.max);ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(sx(p.x),sy(p.y),p.r*T,0,7);ctx.fill();});ctx.globalAlpha=1;
-      if(S.crys!==lastCr){lastCr=S.crys;$('#hcr',node).textContent='◆ '+S.crys+' / '+total;}
-      const tm=S.time.toFixed(0)+' s';if(tm!==lastTm){lastTm=tm;$('#htm',node).textContent=tm;}
+      if(S.crys!==lastCr){lastCr=S.crys;$('#hcr',node).textContent=END?'◆ '+S.crys:'◆ '+S.crys+' / '+total;}
+      const tm=END?dist()+' m':S.time.toFixed(0)+' s';if(tm!==lastTm){lastTm=tm;$('#htm',node).textContent=tm;}
     }
     function frame(now){
       raf=requestAnimationFrame(frame);let dt=(now-last)/1000;last=now;if(dt>.1)dt=.1;
